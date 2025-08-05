@@ -42,7 +42,6 @@ fn main() {
             .application(app)
             .title("Power Menu")
             .default_width(300)
-            .default_height(250)
             .resizable(false)
             .build();
 
