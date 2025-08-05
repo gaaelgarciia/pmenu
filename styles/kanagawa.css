@@ -1,0 +1,24 @@
+window {
+        background-color: #181616;
+    }
+
+#tui-button {
+    background-image: none;
+    background-color: #2A2A37;
+    color: #DCD7BA;
+    border: 0px solid #7E9CD8;
+    border-radius: 0;
+    font-family: 'Iosevka Term';
+    font-size: 15px;
+}
+
+#tui-button:hover {
+    background-color: #2A2A37;
+    color: #C8C093;
+    border-color: #957FB8;
+}
+
+#tui-button:active {
+    background-color: #363646;
+    border-color: #E6C384;
+}

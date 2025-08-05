@@ -1,0 +1,11 @@
+[package]
+name = "pmenu"
+version = "0.1.0"
+edition = "2024"
+
+[package.metadata]
+bundle = true
+
+[dependencies]
+glib = "0.21.0"
+gtk = "0.18.2"
