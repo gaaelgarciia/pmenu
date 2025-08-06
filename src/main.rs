@@ -99,10 +99,11 @@ fn main() {
         });
 
         let vbox = GtkBox::new(gtk::Orientation::Vertical, 5);
-        vbox.set_margin_start(5);
-        vbox.set_margin_end(5);
-        vbox.set_margin_top(5);
-        vbox.set_margin_bottom(5);
+        // vbox.set_margin_start(5);
+        vbox.set_margin(10);
+        // vbox.set_margin_end(5);
+        // vbox.set_margin_top(5);
+        // vbox.set_margin_bottom(5);
         window.add(&vbox);
 
         let buttons = [

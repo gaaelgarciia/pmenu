@@ -1,12 +1,12 @@
 window {
         background-color: #181616;
+    border: 1px solid #dcd7ba;
     }
 
 #tui-button {
     background-image: none;
     background-color: #2A2A37;
     color: #DCD7BA;
-    border: 0px solid #7E9CD8;
     border-radius: 0;
     font-family: 'Iosevka Term';
     font-size: 15px;
