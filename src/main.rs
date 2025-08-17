@@ -2,137 +2,200 @@ use gtk::gdk;
 use gtk::glib::Propagation;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Box as GtkBox, Button, Settings};
-use std::process::Command;
+use std::process::{Command, exit};
 
-fn load_css() {
-    let display = gdk::Screen::default().expect("Could not get default display.");
-    let provider = gtk::CssProvider::new();
-    let priority = gtk::STYLE_PROVIDER_PRIORITY_APPLICATION;
+const APP_ID: &str = "com.example.FirstGtkApp";
+const WINDOW_WIDTH: i32 = 300;
+const CSS_DATA: &[u8] = include_bytes!("../styles/kanagawa.css");
 
-    provider.load_from_data(include_bytes!("../styles/kanagawa.css"));
-    gtk::StyleContext::add_provider_for_screen(&display, &provider, priority);
+// Define commands as constants to avoid string duplication
+mod commands {
+    pub const SHUTDOWN: &str = "systemctl poweroff";
+    pub const REBOOT: &str = "systemctl reboot";
+    pub const EXIT: &str = "swaymsg exit";
+    pub const SUSPEND: &str = "systemctl suspend";
+    pub const LOCK: &str = "swaylock \
+        --screenshots \
+        --clock \
+        --indicator \
+        --indicator-radius 100 \
+        --indicator-thickness 7 \
+        --effect-blur 7x5";
 }
 
-fn set_dark_theme() {
-    if let Some(settings) = Settings::default() {
-        settings.set_gtk_application_prefer_dark_theme(true);
+#[derive(Clone)]
+struct PowerMenuApp {
+    window: ApplicationWindow,
+}
+
+impl PowerMenuApp {
+    fn new(app: &Application) -> Self {
+        Self::load_css();
+        Self::set_dark_theme();
+
+        let window = Self::create_window(app);
+        let app_instance = Self {
+            window: window.clone(),
+        };
+
+        app_instance.setup_window_properties();
+        app_instance.setup_event_handlers();
+        app_instance.create_ui();
+
+        app_instance.show();
+        app_instance
     }
-}
 
-fn execute_command(cmd: &str) {
-    Command::new("sh")
-        .arg("-c")
-        .arg(cmd)
-        .spawn()
-        .expect("Failed to execute command")
-        .wait();
-    gtk::main_quit();
-}
+    fn load_css() {
+        let display = gdk::Screen::default().expect("Could not get default display");
 
-fn main() {
-    let application = Application::builder()
-        .application_id("com.example.FirstGtkApp")
-        .build();
+        let provider = gtk::CssProvider::new();
+        provider
+            .load_from_data(CSS_DATA)
+            .expect("Failed to load CSS");
 
-    application.connect_activate(|app| {
-        load_css();
-        set_dark_theme();
+        gtk::StyleContext::add_provider_for_screen(
+            &display,
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
 
-        let window = ApplicationWindow::builder()
+    fn set_dark_theme() {
+        if let Some(settings) = Settings::default() {
+            settings.set_gtk_application_prefer_dark_theme(true);
+        }
+    }
+
+    fn create_window(app: &Application) -> ApplicationWindow {
+        ApplicationWindow::builder()
             .application(app)
             .title("Power Menu")
-            .default_width(300)
+            .default_width(WINDOW_WIDTH)
             .resizable(false)
-            .build();
+            .build()
+    }
 
-        // Configurar la ventana para que flote por encima del tiling WM
-        window.set_type_hint(gdk::WindowTypeHint::Dialog);
-        window.set_modal(false);
-        window.set_keep_above(true);
-        window.set_decorated(false);
-        window.set_skip_taskbar_hint(true);
-        window.set_skip_pager_hint(true);
+    fn setup_window_properties(&self) {
+        // Configure window for floating above tiling WM
+        self.window.set_type_hint(gdk::WindowTypeHint::Dialog);
+        self.window.set_modal(false);
+        self.window.set_keep_above(true);
+        self.window.set_decorated(false);
+        self.window.set_skip_taskbar_hint(true);
+        self.window.set_skip_pager_hint(true);
 
-        // Centrar la ventana en la pantalla
-        window.set_position(gtk::WindowPosition::Center);
+        // Center window and set focus properties
+        self.window.set_position(gtk::WindowPosition::Center);
+        self.window.set_accept_focus(true);
+        self.window.set_focus_on_map(true);
 
-        // Hacer que la ventana tome el foco
-        window.set_urgency_hint(false);
-        window.set_accept_focus(true);
-        window.set_focus_on_map(true);
+        // Add event masks
+        self.window.add_events(
+            gdk::EventMask::KEY_PRESS_MASK
+                | gdk::EventMask::FOCUS_CHANGE_MASK
+                | gdk::EventMask::BUTTON_PRESS_MASK,
+        );
+    }
 
-        // Configurar atajos de teclado
-        window.add_events(gdk::EventMask::KEY_PRESS_MASK | gdk::EventMask::FOCUS_CHANGE_MASK);
+    fn setup_event_handlers(&self) {
+        // Keyboard shortcuts
+        self.window.connect_key_press_event(|_, event| {
+            let command = match event.keyval() {
+                gdk::keys::constants::s => Some(commands::SHUTDOWN),
+                gdk::keys::constants::r => Some(commands::REBOOT),
+                gdk::keys::constants::e => Some(commands::EXIT),
+                gdk::keys::constants::l => Some(commands::LOCK),
+                gdk::keys::constants::h => Some(commands::SUSPEND),
+                gdk::keys::constants::Escape | gdk::keys::constants::q => {
+                    Self::fast_exit();
+                    return Propagation::Stop;
+                }
+                _ => None,
+            };
 
-        window.connect_key_press_event(move |_, event| {
-            match event.keyval() {
-                // Shutdown
-                gdk::keys::constants::s => execute_command("systemctl poweroff"),
-                // Reboot
-                gdk::keys::constants::r => execute_command("systemctl reboot"),
-                // Exit
-                gdk::keys::constants::e => execute_command("swaymsg exit"),
-                // Lock
-                gdk::keys::constants::l => execute_command(
-                    "killall pmenu && swaylock \
-	--screenshots \
-	--clock \
-	--indicator \
-	--indicator-radius 100 \
-	--indicator-thickness 7 \
-	--effect-blur 7x5 \
-	", // Killall es para que cuando haga swaylock se quite la ventana antes, debe de haber una mejor forma de hacer esto
-                ),
-
-                // Suspend
-                gdk::keys::constants::h => execute_command("systemctl suspend"),
-                gdk::keys::constants::Escape | gdk::keys::constants::q => gtk::main_quit(),
-                _ => (),
+            if let Some(cmd) = command {
+                Self::execute_command_and_exit(cmd);
             }
+
             Propagation::Stop
         });
 
-        // Cerrar cuando se cambie de foco
-        window.connect_focus_out_event(|window, _| {
-            window.close();
-            Propagation::Stop
-        });
+        // Close on any click outside (if we add button press mask)
+        self.window.connect_button_press_event(|window, event| {
+            let (window_width, window_height) = window.size();
+            let (x, y) = event.position();
 
+            // If click is outside window bounds, close immediately
+            if x < 0.0 || y < 0.0 || x > window_width as f64 || y > window_height as f64 {
+                Self::fast_exit();
+            }
+
+            Propagation::Proceed
+        });
+    }
+
+    fn create_ui(&self) {
         let vbox = GtkBox::new(gtk::Orientation::Vertical, 5);
-        // vbox.set_margin_start(5);
         vbox.set_margin(10);
-        // vbox.set_margin_end(5);
-        // vbox.set_margin_top(5);
-        // vbox.set_margin_bottom(5);
-        window.add(&vbox);
 
-        let buttons = [
-            ("(s) Shutdown", "systemctl poweroff"),
-            ("(r) Reboot", "systemctl reboot"),
-            ("(e) Exit", "swaymsg exit"),
-            ("(l) Lock", "swaylock"),
-            ("(h) Suspend", "systemctl suspend"),
+        // Use slice of tuples for cleaner button definition
+        const BUTTONS: &[(&str, &str)] = &[
+            ("(s) Shutdown", commands::SHUTDOWN),
+            ("(r) Reboot", commands::REBOOT),
+            ("(e) Exit", commands::EXIT),
+            ("(l) Lock", commands::LOCK),
+            ("(h) Suspend", commands::SUSPEND),
         ];
 
-        for (label, cmd) in buttons.iter() {
-            let button = Button::with_label(label);
-            button.set_hexpand(true);
-            button.set_vexpand(false);
-            button.set_widget_name("tui-button");
-            // button.set_size_request(0, 0);
-
-            let command = cmd.to_string();
-            button.connect_clicked(move |_| {
-                execute_command(&command);
-            });
+        for &(label, cmd) in BUTTONS {
+            let button = self.create_button(label, cmd);
             vbox.pack_start(&button, false, false, 2);
         }
 
-        window.show_all();
+        self.window.add(&vbox);
+    }
 
-        // Asegurar que la ventana esté en primer plano
-        window.present();
-        window.grab_focus();
+    fn create_button(&self, label: &str, command: &str) -> Button {
+        let button = Button::with_label(label);
+        button.set_hexpand(true);
+        button.set_vexpand(false);
+        button.set_widget_name("tui-button");
+
+        let cmd = command.to_string();
+        button.connect_clicked(move |_| {
+            Self::execute_command_and_exit(&cmd);
+        });
+
+        button
+    }
+
+    // Fast exit without GTK cleanup
+    fn fast_exit() {
+        exit(0);
+    }
+
+    // Execute command and exit immediately
+    fn execute_command_and_exit(cmd: &str) {
+        // Start command in background
+        let _ = Command::new("sh").arg("-c").arg(cmd).spawn();
+
+        // Exit immediately without waiting
+        Self::fast_exit();
+    }
+
+    fn show(&self) {
+        self.window.show_all();
+        self.window.present();
+        self.window.grab_focus();
+    }
+}
+
+fn main() {
+    let application = Application::builder().application_id(APP_ID).build();
+
+    application.connect_activate(|app| {
+        PowerMenuApp::new(app);
     });
 
     application.run();

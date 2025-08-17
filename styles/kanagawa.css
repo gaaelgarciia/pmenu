@@ -5,16 +5,16 @@ window {
 
 #tui-button {
     background-image: none;
-    background-color: #2A2A37;
-    color: #DCD7BA;
+    background-color: #c5c9c5;
+    color: #181616;
     border-radius: 0;
     font-family: 'Iosevka Term';
     font-size: 15px;
 }
 
 #tui-button:hover {
-    background-color: #2A2A37;
-    color: #C8C093;
+    background-color: #181616;
+    color: #c5c9c5;
     border-color: #957FB8;
 }
 
