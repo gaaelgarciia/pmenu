@@ -9,7 +9,8 @@ use std::process::{Command, exit};
 const APP_ID: &str = "com.example.FirstGtkApp";
 const WINDOW_WIDTH: i32 = 300;
 const CSS_DATA: &[u8] = include_bytes!("../styles/kanagawa.css");
-const CONFIG_FILE: &str = "config.toml";
+const CONFIG_FILE: &str = ".config/pmenu/config.toml";
+const CONFIG_DIR: &str = ".config/pmenu";
 
 #[derive(Deserialize, Serialize, Clone)]
 struct PowerMenuConfig {
@@ -94,7 +95,11 @@ impl PowerMenuApp {
     }
 
     fn load_config() -> PowerMenuConfig {
-        match fs::read_to_string(CONFIG_FILE) {
+        let mut config_dir = dirs::home_dir().expect("No HOME dir found");
+        config_dir.push(CONFIG_DIR);
+        let mut config_file = std::path::PathBuf::from(&config_dir);
+        config_file.push("config.toml");
+        match fs::read_to_string(config_file) {
             Ok(contents) => match toml::from_str::<PowerMenuConfig>(&contents) {
                 Ok(config) => {
                     println!("Loaded configuration from {}", CONFIG_FILE);
@@ -125,10 +130,28 @@ impl PowerMenuApp {
         let toml_string = toml::to_string_pretty(&default_config)
             .expect("Failed to serialize default configuration");
 
-        if let Err(e) = fs::write(CONFIG_FILE, toml_string) {
+        // Build path ~/.config/pmenu/
+        let mut config_dir = dirs::home_dir().expect("No HOME dir found");
+        config_dir.push(CONFIG_DIR);
+
+        // Crear directorio
+        if let Err(e) = fs::create_dir_all(&config_dir) {
+            eprintln!("Failed to create config directory: {}", e);
+            return;
+        }
+
+        // Ruta completa al archivo
+        let mut config_file = std::path::PathBuf::from(&config_dir);
+        config_file.push("config.toml");
+
+        // Guardar archivo
+        if let Err(e) = fs::write(&config_file, toml_string) {
             eprintln!("Failed to write default configuration file: {}", e);
         } else {
-            println!("Created default configuration file: {}", CONFIG_FILE);
+            println!(
+                "Created default configuration file: {}",
+                config_file.display()
+            );
         }
     }
 
